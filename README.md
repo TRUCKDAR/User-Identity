@@ -28,82 +28,70 @@ eventos de dominio al bus de eventos compartido.
 ```mermaid
 flowchart TB
     subgraph Clientes["Clientes de la Plataforma"]
-        direction LR
         MobileApp["📱 App Móvil (Flutter / RN)<br/>Conductores de Carga"]
-        WebPanel["💻 Torre de Control (React Web)<br/>Coordinadores & Despachadores"]
+        WebPanel["💻 Torre de Control (React Web)<br/>Coordinadores y Despachadores"]
     end
 
-    subgraph Perimetro["Perímetro de Red / Entrada"]
-        ApiGateway["🛡️ API Gateway (Kong / AWS API Gateway)<br/>• Enrutamiento • Rate Limiting • SSL Termination"]
+    subgraph Perimetro["Perímetro de Entrada"]
+        ApiGateway["🛡️ API Gateway (Kong / AWS API Gateway)<br/>• Enrutamiento • Rate Limiting • SSL"]
     end
 
     subgraph UserIdentityBoundary["Microservicio User-Identity (Puerto 8080)"]
         direction TB
-        Security["🔐 Spring Security 6<br/>(Stateless JWT Filter)"]
-        RestControllers["🎮 Capa REST (Controllers)<br/>• AuthController<br/>• UserController"]
-        BusinessServices["⚙️ Capa de Negocio (Services)<br/>• AuthServiceImpl<br/>• UserServiceImpl<br/>• JwtProvider"]
-        DataRepositories["💾 Capa de Persistencia<br/>• UserRepository<br/>• RefreshTokenRepository"]
+        Security["🔐 Spring Security 6<br/>Stateless JWT Filter"]
+        RestControllers["🎮 Capa REST (Controllers)<br/>AuthController / UserController"]
+        BusinessServices["⚙️ Capa de Negocio (Services)<br/>AuthService / UserService / JwtProvider"]
+        DataRepositories["💾 Capa de Persistencia<br/>UserRepository / RefreshTokenRepository"]
+        
+        Security --> RestControllers
+        RestControllers --> BusinessServices
+        BusinessServices --> DataRepositories
     end
 
     subgraph Datos["Almacenamiento de Datos"]
-        PostgresDB[("🐘 PostgreSQL 16<br/>truckdar_identity<br/>(Users + Refresh Tokens)")]
+        PostgresDB[("🐘 PostgreSQL 16<br/>truckdar_identity")]
     end
 
     subgraph Eventos["Bus de Eventos Asíncrono"]
-        KafkaBus[["📨 Kafka / AWS MSK<br/>Event Bus Compartido"]]
+        KafkaBus[["📨 Apache Kafka / AWS MSK"]]
         FleetsService["🚛 Microservicio Flotas"]
         DispatchService["📋 Microservicio Asignación"]
     end
 
-    MobileApp -->|HTTPS /api/v1/auth/*| ApiGateway
-    WebPanel -->|HTTPS /api/v1/users/*| ApiGateway
-    ApiGateway -->|Ruta interna HTTP| Security
-    Security --> RestControllers
-    RestControllers --> BusinessServices
-    BusinessServices --> DataRepositories
-    DataRepositories -->|JPA / Flyway SQL| PostgresDB
-    BusinessServices -.->|Publica eventos de dominio<br/>(UserRegistered, UserRoleChanged)| KafkaBus
-    KafkaBus -.->|Consume eventos| FleetsService
-    KafkaBus -.->|Consume eventos| DispatchService
-
-    classDef client fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#0369a1;
-    classDef gateway fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#92400e;
-    classDef core fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46;
-    classDef data fill:#f3e8ff,stroke:#9333ea,stroke-width:2px,color:#6b21a8;
-    classDef events fill:#ffe4e6,stroke:#e11d48,stroke-width:2px,color:#9f1239;
-
-    class MobileApp,WebPanel client;
-    class ApiGateway gateway;
-    class Security,RestControllers,BusinessServices,DataRepositories core;
-    class PostgresDB data;
-    class KafkaBus,FleetsService,DispatchService events;
+    MobileApp -->|"HTTPS /api/v1/auth/*"| ApiGateway
+    WebPanel -->|"HTTPS /api/v1/users/*"| ApiGateway
+    ApiGateway -->|"HTTP Interno"| Security
+    DataRepositories -->|"JDBC / Flyway"| PostgresDB
+    BusinessServices -.->|"Publica eventos: UserRegistered, UserRoleChanged"| KafkaBus
+    KafkaBus -.->|"Consume eventos"| FleetsService
+    KafkaBus -.->|"Consume eventos"| DispatchService
 ```
 
 ### 2. Arquitectura Interna por Capas
 
 ```mermaid
-graph TD
-    ClientReq["Petición HTTP entrante"] --> JwtFilter["JwtAuthenticationFilter<br/>(Extrae Bearer Token & valida firma)"]
-    JwtFilter --> SecurityContext["SecurityContextHolder<br/>(ROLE_CONDUCTOR / ROLE_COORDINADOR / ROLE_ADMIN)"]
-    SecurityContext --> DispatcherServlet["Spring MVC DispatcherServlet"]
+flowchart TD
+    Req["Petición HTTP entrante"] --> JwtFilter["JwtAuthenticationFilter<br/>(Valida firma HMAC-SHA512)"]
+    JwtFilter --> SecContext["SecurityContextHolder<br/>(Establece ROLE y Principal)"]
+    SecContext --> Dispatcher["Spring MVC DispatcherServlet"]
 
-    subgraph Presentation["Capa de Presentación / Web"]
-        DispatcherServlet --> AuthCtrl["AuthController"]
-        DispatcherServlet --> UserCtrl["UserController"]
-        GlobalEx["GlobalExceptionHandler<br/>(@RestControllerAdvice)"] -.->|Intercepta excepciones| ClientReq
+    subgraph Presentation["Capa Web / Presentación"]
+        Dispatcher --> AuthCtrl["AuthController"]
+        Dispatcher --> UserCtrl["UserController"]
+        GlobalEx["GlobalExceptionHandler<br/>(@RestControllerAdvice)"] -.->|Intercepta errores| Req
     end
 
-    subgraph Application["Capa de Aplicación y Servicios"]
-        AuthCtrl --> AuthSvc["AuthService / AuthServiceImpl"]
-        UserCtrl --> UserSvc["UserService / UserServiceImpl"]
-        AuthSvc -.-> JwtProv["JwtProvider<br/>(Generación & validación HMAC-SHA512)"]
-        AuthSvc -.-> PassEnc["PasswordEncoder<br/>(BCrypt hashing)"]
-        AuthSvc & UserSvc -.-> Mappers["MapStruct Mappers<br/>(UserMapper)"]
-        AuthSvc & UserSvc -.-> EventPub["DomainEventPublisher<br/>(Logging / Kafka)"]
+    subgraph ServiceLayer["Capa de Negocio y Seguridad"]
+        AuthCtrl --> AuthSvc["AuthServiceImpl"]
+        UserCtrl --> UserSvc["UserServiceImpl"]
+        AuthSvc -.-> JwtProv["JwtProvider"]
+        AuthSvc -.-> PassEnc["BCryptPasswordEncoder"]
+        AuthSvc & UserSvc -.-> Mapper["UserMapper (MapStruct)"]
+        AuthSvc & UserSvc -.-> DomainEvents["DomainEventPublisher"]
     end
 
-    subgraph Persistence["Capa de Dominio y Persistencia"]
-        AuthSvc & UserSvc --> UserRepo["UserRepository (Spring Data JPA)"]
+    subgraph PersistenceLayer["Capa de Persistencia"]
+        AuthSvc & UserSvc --> UserRepo["UserRepository"]
         AuthSvc --> TokenRepo["RefreshTokenRepository"]
         UserRepo & TokenRepo --> DB[("PostgreSQL 16 / H2")]
     end
@@ -111,51 +99,76 @@ graph TD
 
 ### 3. Flujo de Autenticación y Autorización (JWT)
 
+#### 3.1. Flujo de Registro e Inicio de Sesión (Emisión de Tokens)
+
 ```mermaid
 sequenceDiagram
     autonumber
-    actor U as Usuario (App / Web)
-    participant SEC as Spring Security / Filtro
-    participant CTRL as AuthController
-    participant SVC as AuthServiceImpl
-    participant BC as PasswordEncoder (BCrypt)
-    participant JWT as JwtProvider
-    participant DB as PostgreSQL
-    participant BUS as Event Publisher
+    actor Cliente as 📱 Cliente (App / Web)
+    participant AuthCtrl as AuthController
+    participant AuthSvc as AuthServiceImpl
+    participant PassEnc as PasswordEncoder (BCrypt)
+    participant JwtProv as JwtProvider
+    participant DB as PostgreSQL 16
+    participant Bus as Event Publisher
 
-    %% Registro
-    rect rgb(240, 248, 255)
-    note over U,BUS: 1. Flujo de Registro
-    U->>CTRL: POST /api/v1/auth/register (datos + rol)
-    CTRL->>SVC: register(request)
-    SVC->>DB: findByEmail(email)
-    alt Email ya registrado
-        SVC-->>U: 409 Conflict (UserAlreadyExistsException)
+    %% Caso Registro
+    Note over Cliente,Bus: Escenario A: Registro de Nuevo Usuario
+    Cliente->>AuthCtrl: POST /api/v1/auth/register
+    AuthCtrl->>AuthSvc: register(request)
+    AuthSvc->>DB: findByEmail(email)
+    alt Email ya existe en BD
+        AuthSvc-->>Cliente: 409 Conflict (UserAlreadyExistsException)
     else Email disponible
-        SVC->>BC: encode(rawPassword)
-        BC-->>SVC: passwordHash
-        SVC->>DB: save(User)
-        SVC->>JWT: generateAccessToken(User) + generateRefreshToken()
-        JWT-->>SVC: Tokens
-        SVC->>DB: save(RefreshToken)
-        SVC->>BUS: publish(UserRegisteredEvent)
-        SVC-->>U: 201 Created: { accessToken, refreshToken, tokenType, expiresIn }
-    end
+        AuthSvc->>PassEnc: encode(rawPassword)
+        PassEnc-->>AuthSvc: passwordHash
+        AuthSvc->>DB: save(User)
+        AuthSvc->>JwtProv: generateAccessToken() + generateRefreshToken()
+        JwtProv-->>AuthSvc: Token Pair
+        AuthSvc->>DB: save(RefreshToken)
+        AuthSvc->>Bus: publish(UserRegisteredEvent)
+        AuthSvc-->>Cliente: 201 Created: { accessToken, refreshToken, tokenType, expiresIn }
     end
 
-    %% Petición Protegida
-    rect rgb(240, 255, 240)
-    note over U,BUS: 2. Petición a Endpoint Protegido (ej. GET /api/v1/users/me)
-    U->>SEC: GET /api/v1/users/me + Header "Authorization: Bearer <token>"
-    SEC->>JWT: validateToken(token)
-    alt Token válido
-        JWT-->>SEC: Claims (userId, role=CONDUCTOR)
-        SEC->>SEC: Establece SecurityContext (ROLE_CONDUCTOR)
-        SEC->>CTRL: Pasa la petición al UserController
-        CTRL->>U: 200 OK con UserResponse
-    else Token inválido o expirado
-        SEC-->>U: 401 Unauthorized (JwtAuthenticationEntryPoint)
+    %% Caso Login
+    Note over Cliente,Bus: Escenario B: Inicio de Sesión (Login)
+    Cliente->>AuthCtrl: POST /api/v1/auth/login (email, password)
+    AuthCtrl->>AuthSvc: login(request)
+    AuthSvc->>DB: findByEmail(email)
+    AuthSvc->>PassEnc: matches(rawPassword, storedHash)
+    alt Credenciales inválidas
+        AuthSvc-->>Cliente: 401 Unauthorized (BadCredentialsException)
+    else Credenciales válidas
+        AuthSvc->>JwtProv: generateAccessToken() + generateRefreshToken()
+        AuthSvc->>DB: save(RefreshToken)
+        AuthSvc-->>Cliente: 200 OK: { accessToken, refreshToken, tokenType, expiresIn }
     end
+```
+
+#### 3.2. Flujo de Validación de Petición Protegida y Control de Acceso (RBAC)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Cliente as 📱 Cliente Autenticado
+    participant SecurityFilter as JwtAuthenticationFilter
+    participant JwtProv as JwtProvider
+    participant SecurityContext as SecurityContextHolder
+    participant UserCtrl as UserController
+    participant UserSvc as UserServiceImpl
+
+    Cliente->>SecurityFilter: Petición HTTP con Header Authorization: Bearer <token>
+    SecurityFilter->>JwtProv: validateToken(token)
+
+    alt Token expirado o firma inválida
+        SecurityFilter-->>Cliente: 401 Unauthorized (JwtAuthenticationEntryPoint)
+    else Token válido
+        SecurityFilter->>JwtProv: getUserIdFromToken() y getRoleFromToken()
+        JwtProv-->>SecurityFilter: userId (UUID), role ("CONDUCTOR")
+        SecurityFilter->>SecurityContext: setAuthentication(userId, [ROLE_CONDUCTOR])
+        SecurityFilter->>UserCtrl: Continúa a controlador correspondiente
+        UserCtrl->>UserSvc: getProfile(userId)
+        UserSvc-->>Cliente: 200 OK (UserResponse DTO)
     end
 ```
 
@@ -163,31 +176,31 @@ sequenceDiagram
 
 ```mermaid
 erDiagram
+    USERS ||--o{ REFRESH_TOKENS : "posee"
+
     USERS {
-        uuid id PK "UUID autogenerado"
-        varchar email UK "Email único"
-        varchar password_hash "Hash BCrypt"
-        varchar first_name "Nombre"
-        varchar last_name "Apellido"
-        varchar phone_number "Teléfono de contacto"
+        uuid id PK "UUID identificador único"
+        varchar email UK "Correo electrónico único"
+        varchar password_hash "Hash seguro con algoritmo BCrypt"
+        varchar first_name "Nombre(s)"
+        varchar last_name "Apellido(s)"
+        varchar phone_number "Número de teléfono"
         varchar document_type "CC, CE, PASAPORTE, NIT"
-        varchar document_number "Número de documento"
-        varchar role "CONDUCTOR | COORDINADOR | ADMIN"
-        varchar status "PENDING_VERIFICATION | ACTIVE | SUSPENDED"
-        timestamptz created_at "Fecha de creación"
-        timestamptz updated_at "Fecha de última actualización"
-        timestamptz last_login_at "Último inicio de sesión"
+        varchar document_number "Número de documento de identidad"
+        varchar role "Rol: CONDUCTOR, COORDINADOR, ADMIN"
+        varchar status "Estado: ACTIVE, PENDING_VERIFICATION, SUSPENDED"
+        timestamptz created_at "Fecha y hora de creación"
+        timestamptz updated_at "Fecha y hora de actualización"
+        timestamptz last_login_at "Fecha del último inicio de sesión"
     }
 
     REFRESH_TOKENS {
-        uuid id PK "UUID autogenerado"
-        uuid user_id FK "Referencia a USERS(id) ON DELETE CASCADE"
-        varchar token UK "Cadena única del token"
-        timestamptz expires_at "Fecha de expiración (7 días)"
-        boolean revoked "Estado de revocación (logout/rotación)"
+        uuid id PK "UUID identificador del token"
+        uuid user_id FK "FK referencia a users(id) ON DELETE CASCADE"
+        varchar token UK "Token criptográfico opaco único"
+        timestamptz expires_at "Fecha límite de vigencia (7 días)"
+        boolean revoked "Estado de validez (false=activo, true=revocado)"
     }
-
-    USERS ||--o{ REFRESH_TOKENS : "1 usuario tiene 0..N"
 ```
 
 ---
