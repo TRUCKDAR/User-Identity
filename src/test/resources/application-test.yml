@@ -1,0 +1,16 @@
+# ═══════════════════════════════════════════
+# Perfil: test (usado por los tests de integración)
+# ═══════════════════════════════════════════
+
+spring:
+  jpa:
+    show-sql: false
+  flyway:
+    enabled: true
+
+# JWT secret para tests (NO usar en producción)
+app:
+  jwt:
+    secret: dGVzdC1zZWNyZXQta2V5LWZvci10cnVja2Rhci11c2VyLWlkZW50aXR5LXRlc3Rpbmc=
+    access-token-expiration-ms: 900000
+    refresh-token-expiration-ms: 604800000

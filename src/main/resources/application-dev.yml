@@ -1,0 +1,16 @@
+# ═══════════════════════════════════════════
+# Perfil: dev (ambiente de desarrollo compartido)
+# ═══════════════════════════════════════════
+
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+  jpa:
+    show-sql: false
+
+logging:
+  level:
+    escuelaing.edu.co.truckdar: INFO

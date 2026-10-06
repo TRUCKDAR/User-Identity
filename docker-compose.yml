@@ -1,0 +1,39 @@
+# ═══════════════════════════════════════════════════════════════════
+# Docker Compose — Desarrollo local del User-Identity Microservice
+# Levanta PostgreSQL + pgAdmin (opcional) para desarrollo
+# ═══════════════════════════════════════════════════════════════════
+
+services:
+  # ── PostgreSQL ──
+  postgres:
+    image: postgres:16-alpine
+    container_name: truckdar-identity-db
+    environment:
+      POSTGRES_DB: truckdar_identity
+      POSTGRES_USER: truckdar
+      POSTGRES_PASSWORD: truckdar
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U truckdar -d truckdar_identity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── pgAdmin (opcional, útil para inspección visual) ──
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: truckdar-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@truckdar.co
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
