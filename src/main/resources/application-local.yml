@@ -1,0 +1,17 @@
+# ═══════════════════════════════════════════
+# Perfil: local (desarrollo en máquina del dev)
+# ═══════════════════════════════════════════
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/truckdar_identity
+    username: truckdar
+    password: truckdar
+
+  jpa:
+    show-sql: true
+
+logging:
+  level:
+    escuelaing.edu.co.truckdar: DEBUG
+    org.springframework.security: DEBUG
