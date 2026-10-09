@@ -1,58 +1,55 @@
-# ═══════════════════════════════════════════════════════════════════
-# TruckDar — User Identity Microservice
-# Configuración base (se sobreescribe por perfil: local, dev, prod)
-# ═══════════════════════════════════════════════════════════════════
+server:
+  port: ${PORT:8080}
 
 spring:
   application:
     name: user-identity
 
-  # ── Base de datos ──
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/truckdar_identity}
-    username: ${DB_USERNAME:truckdar}
-    password: ${DB_PASSWORD:truckdar}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:truckdar_db}
+    username: ${DB_USER:truckdar_admin}
+    password: ${DB_PASSWORD:truckdar_password}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: user-identity-hikari-pool
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 30000
+      connection-timeout: 20000
+      max-lifetime: 1200000
 
   jpa:
     hibernate:
       ddl-auto: validate
-    open-in-view: false
+    show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
+        dialect: org.hibernate.dialect.PostgreSQLDialect
 
-  # ── Flyway ──
   flyway:
     enabled: true
+    baseline-on-migrate: true
     locations: classpath:db/migration
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:truckdar_db}
+    user: ${DB_USER:truckdar_admin}
+    password: ${DB_PASSWORD:truckdar_password}
 
-# ── JWT ──
+# Configuración de Seguridad y JWT (Alineada con api-gateway)
+security:
+  jwt:
+    secret-key: ${JWT_SECRET:TruckDarSecretKeySecurityAuthenticationToken2026MasterKey!}
+    access-token-expiration-ms: ${JWT_EXPIRATION_MS:86400000} # 24 horas
+    refresh-token-expiration-ms: ${REFRESH_TOKEN_EXPIRATION_MS:604800000} # 7 días
+
 app:
   jwt:
-    secret: ${JWT_SECRET:dHJ1Y2tkYXItdXNlci1pZGVudGl0eS1zZWNyZXQta2V5LWJhc2U2NC1lbmNvZGVkLWF0LWxlYXN0LTI1Ni1iaXRz}
-    access-token-expiration-ms: ${JWT_ACCESS_EXPIRATION:900000}
-    refresh-token-expiration-ms: ${JWT_REFRESH_EXPIRATION:604800000}
+    secret: ${JWT_SECRET:TruckDarSecretKeySecurityAuthenticationToken2026MasterKey!}
 
-# ── Actuator ──
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
-  endpoint:
-    health:
-      show-details: when-authorized
-      probes:
-        enabled: true
-
-# ── OpenAPI ──
 springdoc:
   api-docs:
     path: /v3/api-docs
   swagger-ui:
     path: /swagger-ui.html
-
-# ── Servidor ──
-server:
-  port: ${SERVER_PORT:8080}
+    operations-sorter: method
+    tags-sorter: alpha

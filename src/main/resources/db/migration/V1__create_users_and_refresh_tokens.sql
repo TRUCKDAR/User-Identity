@@ -33,3 +33,15 @@ CREATE TABLE refresh_tokens (
 
 CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens (user_id);
 CREATE INDEX idx_refresh_tokens_token   ON refresh_tokens (token);
+
+INSERT INTO users (id, email, password, full_name, role, status, created_at, updated_at)
+VALUES (
+           gen_random_uuid(),
+           'admin@truckdar.com',
+           '$2a$10$wK1k6Iq5x2S9VqA9y/zB.eZ2Q5v7Z0B7E0O3Y1l1N4Y5g2c3E5k2G',
+           'Admin TruckDar',
+           'ADMIN',
+           'ACTIVE',
+           CURRENT_TIMESTAMP,
+           CURRENT_TIMESTAMP
+       ) ON CONFLICT (email) DO NOTHING;
