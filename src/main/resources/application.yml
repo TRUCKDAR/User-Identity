@@ -20,7 +20,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     show-sql: false
     properties:
       hibernate:
@@ -35,16 +35,18 @@ spring:
     user: ${DB_USER:truckdar_admin}
     password: ${DB_PASSWORD:truckdar_password}
 
-# Configuración de Seguridad y JWT (Alineada con api-gateway)
-security:
-  jwt:
-    secret-key: ${JWT_SECRET:TruckDarSecretKeySecurityAuthenticationToken2026MasterKey!}
-    access-token-expiration-ms: ${JWT_EXPIRATION_MS:86400000} # 24 horas
-    refresh-token-expiration-ms: ${REFRESH_TOKEN_EXPIRATION_MS:604800000} # 7 días
-
 app:
   jwt:
     secret: ${JWT_SECRET:TruckDarSecretKeySecurityAuthenticationToken2026MasterKey!}
+    secret-key: ${JWT_SECRET:TruckDarSecretKeySecurityAuthenticationToken2026MasterKey!}
+    access-token-expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+    refresh-token-expiration-ms: ${REFRESH_TOKEN_EXPIRATION_MS:604800000}
+
+security:
+  jwt:
+    secret-key: ${JWT_SECRET:TruckDarSecretKeySecurityAuthenticationToken2026MasterKey!}
+    access-token-expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+    refresh-token-expiration-ms: ${REFRESH_TOKEN_EXPIRATION_MS:604800000}
 
 springdoc:
   api-docs:
